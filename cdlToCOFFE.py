@@ -131,6 +131,31 @@ def replaceNmosPmos(cktinfo:dict, pmosname:str, nmosname:str) -> dict:
             comp['type'] = 'nmos'
     return cktinfo
 
+def makeGenerateMethod(cktinfo:dict) -> str:
+    final = ''
+    title = cktinfo['name'] + '_generate(filname, use_finfet):\n'
+    final += title
+    final += '\tspice_file = open(filename, "a")\n\n'
+    final += '\tspice_file.write("******************************************************************************************\\n")\n'
+    final += '\tspice_file.write(*' + cktinfo['name'] + '\\n)\n'
+    final += '\tspice_file.write("******************************************************************************************\\n")\n'
+    subcktports = ''
+    for port in subckt['ports']:
+        subcktports += port + ' '
+    subcktdef = '\tspice_file.write(".SUBCKT' + cktinfo['name'] + ' ' + subcktports + 'Wn= Wp= \\n")\n'
+    final += subcktdef
+    for c in cktinfo['components']:
+        cs = c['name'] + ' '
+        portstr = ''
+        for port in c['connections']:
+            portstr += port + ' '
+        cs += portstr
+        cs += ' L=gate_length W=Wn AS=Wn*trans_diffusion_length AD=Wn*trans_diffusion_length PS=Wn+2*trans_diffusion_length PD=Wn+2*trans_diffusion_length'
+        final+='\tspice_file.write("' + cs + '\\n")\n'
+    final += '\tspice_file.write(".ENDS\\n")\n'
+    final += '\n\tsprice_file.close()'
+    return final
+
 def extract_gate_name(gate_string):
     # Regular expression to match the gate name and preserve the number of inputs
     #find last X
@@ -151,7 +176,8 @@ def extract_gate_name(gate_string):
         # If the format doesn't match, return None or an error message
         return None
 
-
+def rename_vdd_gnd(subckt:dict):
+    print('do this later')
 
 parser = argparse.ArgumentParser(
     prog='cdl translation tool',
@@ -160,7 +186,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('-lib', '-cdl ', '--library', required=True)
-parser.add_argument('-sp', '--spice', required=True)
+# parser.add_argument('-sp', '--spice', required=True)
 parser.add_argument('-out', '--output')
 parser.add_argument('-pmos', '--pmosname')
 parser.add_argument('-nmos', '--nmosname')
@@ -169,7 +195,7 @@ parser.add_argument('-nmos', '--nmosname')
 args = parser.parse_args()
 print(args)
 libin = args.library
-spin = args.spice
+# spin = args.spice
 out = args.output
 if out == None:
     out = 'output.l'
@@ -182,7 +208,7 @@ if nmosname == None:
     nmosname = 'nmos'
 
 libf = open(libin)
-spf = open(spin)
+# spf = open(spin)
 
 lintedlib = cleanCdl(libf)
 reformatted= reformatLib(lintedlib)
@@ -300,3 +326,8 @@ for sub in finalSubs:
 #finally, create the standard library file
 #TODO create a function that will generate a python method as a string
 #The resulting python methods should each generate the subcircuits
+code = ''
+for sub in finalSubs:
+    code += makeGenerateMethod(sub) + '\n'
+
+print(code)
