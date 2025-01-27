@@ -1,0 +1,11 @@
+{
+    "gates" : [
+        "and",
+        "nand",
+        "nor",
+        "xnor",
+        "or",
+        "not",
+        "xor"
+    ]
+}

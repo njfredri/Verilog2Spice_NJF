@@ -8,6 +8,7 @@
 
 import argparse
 import re
+import json
 
 def extractCellNames(input: str) -> str:
     # Regular expression to extract cell names
@@ -120,7 +121,15 @@ def extractSUBCKTInfo(ckt:str) -> dict:
             else:
                 cinfo['misc'].append(spl)
         info['components'].append(cinfo)
-    # print(info)
+    return info
+
+def replaceNmosPmos(cktinfo:dict, pmosname:str, nmosname:str) -> dict:
+    for comp in cktinfo['components']:
+        if comp['type'].lower() == pmosname.lower():
+            comp['type'] = 'pmos'
+        elif comp['type'].lower() == nmosname.lower():
+            comp['type'] = 'nmos'
+    return cktinfo
 
 parser = argparse.ArgumentParser(
     prog='cdl translation tool',
@@ -131,6 +140,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-lib', '-cdl ', '--library', required=True)
 parser.add_argument('-sp', '--spice', required=True)
 parser.add_argument('-out', '--output')
+parser.add_argument('-pmos', '--pmosname')
+parser.add_argument('-nmos', '--nmosname')
+
 
 args = parser.parse_args()
 print(args)
@@ -139,6 +151,13 @@ spin = args.spice
 out = args.output
 if out == None:
     out = 'output.l'
+pmosname = args.pmosname
+if pmosname == None:
+    pmosname = 'pmos'
+
+nmosname = args.nmosname
+if nmosname == None:
+    nmosname = 'nmos'
 
 libf = open(libin)
 spf = open(spin)
@@ -146,7 +165,6 @@ spf = open(spin)
 lintedlib = cleanCdl(libf)
 reformatted= reformatLib(lintedlib)
 cellnames = extractCellNames(reformatted)
-# reformatted = cellnames + '\n' + reformatted
 
 #now go through and extract information for each subckt
 subckts = lintedlib.split('.subckt')
@@ -155,6 +173,27 @@ subinfo = []
 for subckt in subckts[1:]:
     subinfo.append(extractSUBCKTInfo(subckt))
 
+wrapper = {}
+wrapper['subcircuits'] = subinfo
+with open('temp1.json', 'w+') as outfile:
+    json.dump(wrapper, outfile)
+
+#go through and replace pmos and nmos names
+newsubinfo = []
+for subckt in subinfo:
+    newinfo = replaceNmosPmos(subckt, pmosname=pmosname, nmosname=nmosname)
+    newsubinfo.append(newinfo)
+
+#go through the various gates and categorize them
+gatefile = open('basic_circuits.json')
+basicgates = json.load(gatefile)
+for subckt in newsubinfo:
+    for gate in gatefile
+
+wrapper = {}
+wrapper['subcircuits'] = newsubinfo
+with open('temp2.json', 'w+') as outfile:
+    json.dump(wrapper, outfile)
 
 outf = open(out, mode='+w')
 outf.write(reformatted)
