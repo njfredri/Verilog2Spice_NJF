@@ -1,0 +1,3 @@
+# Ignore all cell library and model files. Helps to avoid copyright issues.
+*.cdl
+*.l
