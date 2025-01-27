@@ -46,7 +46,7 @@ def cleanCdl(file) -> str:
         cleanline = re.sub(r"m = \d+", "", cleanline)
         #remove extra spaces
         cleanline = re.sub(r"\s+", " ", cleanline).strip()
-
+        cleanline = cleanline.replace(' = ', '=')
 
         if len(cleanline) != 0 and cleanline not in emptylines:
             cleanlines.append(cleanline)
@@ -64,11 +64,63 @@ def reformatLib(lib: str) -> str:
     lib = lib.replace(".global", "\n.global")
     return lib
 
+def filterListForEmptyStr(in_list: list) -> list:
+    out_list = []
+    for item in in_list:
+        if len(item) == 0:
+            continue
+        if item == ' ':
+            continue
+        if item == '\n':
+            continue
+        out_list.append(item)
+    return out_list
+
+def extractConnections(splitline: list) -> list:
+    out_list = []
+    for p in splitline[1:5]:
+        if '=' in p:
+            continue
+        out_list.append(p)
+    return out_list
+
 def extractSUBCKTInfo(ckt:str) -> dict:
-    print(ckt)
+    info = {}
+    # print(ckt)
     cktlines = ckt.split('\n')
-    topdef = cktlines[0]
-    
+    topdef = filterListForEmptyStr(cktlines[0].split(' '))
+    # print(topdef)
+    info['name'] = topdef[0]
+    info['ports'] = topdef[1:]
+    info['components'] = []
+    for component in cktlines[1:]: #for now, assume everything is nmos and pmos
+        cinfo = {}
+        split = component.split(' ')
+        print('split ' + str(split))
+        #skip if end definition
+        if(split[0] == '.ends'):
+            break
+
+        #figure out how many non-equal things there are
+        firstequal = 0
+        for spl in split:
+            if '=' in spl:
+                break
+            firstequal += 1
+        # print('first equal ' + str(firstequal))
+        cinfo['name'] = split[0]
+        cinfo['connections'] = split[1:firstequal-1]
+        cinfo['type'] = split[firstequal-1]
+        cinfo['misc'] = []
+        for spl in split[firstequal:]:
+            if('l=' in str.lower(spl)):
+                cinfo['l'] = spl.split('=')[-1]
+            elif('w=' in str.lower(spl)):
+                cinfo['w'] = spl.split('=')[-1]
+            else:
+                cinfo['misc'].append(spl)
+        info['components'].append(cinfo)
+    # print(info)
 
 parser = argparse.ArgumentParser(
     prog='cdl translation tool',
@@ -96,11 +148,12 @@ reformatted= reformatLib(lintedlib)
 cellnames = extractCellNames(reformatted)
 # reformatted = cellnames + '\n' + reformatted
 
-#now go through and extract information for each
+#now go through and extract information for each subckt
 subckts = lintedlib.split('.subckt')
-# print(subckts)
-extractSUBCKTInfo(subckts[1])
-extractSUBCKTInfo(subckts[5])
+
+subinfo = []
+for subckt in subckts[1:]:
+    subinfo.append(extractSUBCKTInfo(subckt))
 
 
 outf = open(out, mode='+w')
