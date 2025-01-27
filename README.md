@@ -13,3 +13,5 @@ _**python verilog2spice.py -spice stdcells.cdl -spice memory.cdl -verilog final.
  * under Linux, the command python can be avoided or replaced by python3
  * if pos_pwr and neg_pwr are not specified, they are by default VDD and VSS
  * if -delimiter is used, the busses delimiter will be changed from [:] in the verilog netlist to <:> in the spice netlist
+
+Small, personal modifications made to original repo
