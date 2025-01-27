@@ -131,6 +131,28 @@ def replaceNmosPmos(cktinfo:dict, pmosname:str, nmosname:str) -> dict:
             comp['type'] = 'nmos'
     return cktinfo
 
+def extract_gate_name(gate_string):
+    # Regular expression to match the gate name and preserve the number of inputs
+    #find last X
+    lastX = gate_string.lower().rfind('x')
+    match = False
+    if lastX != None and lastX > 0:
+        match = True
+
+    if match:
+        # Extract the gate name and number of inputs
+        # gate_name = match.group(1)  # This is the gate's main name (e.g., 'NOR')
+        # num_inputs = match.group(2)  # This is the number of inputs (e.g., '2')
+        gate_name = gate_string[0:lastX]
+
+        # Return the combined result: main name with the number of inputs
+        return gate_name
+    else:
+        # If the format doesn't match, return None or an error message
+        return None
+
+
+
 parser = argparse.ArgumentParser(
     prog='cdl translation tool',
     description='Converts a cdl to another technology node using information from a spice model',
@@ -187,13 +209,94 @@ for subckt in subinfo:
 #go through the various gates and categorize them
 gatefile = open('basic_circuits.json')
 basicgates = json.load(gatefile)
+categorizedCircuits = {'misc': []}
 for subckt in newsubinfo:
-    for gate in gatefile
+    added = False
+    minInfo = {}
+    minInfo['name'] = subckt['name']
+    minInfo['ports'] = subckt['ports']
+    for gate in basicgates['gates']:
+        if gate in subckt['name'].lower():
+            if gate in categorizedCircuits.keys():
+                categorizedCircuits[gate].append(minInfo)
+            else:
+                categorizedCircuits[gate] = []
+                categorizedCircuits[gate].append(minInfo)
+            added = True
+    if not added:
+        categorizedCircuits['misc'].append(minInfo)
 
-wrapper = {}
-wrapper['subcircuits'] = newsubinfo
-with open('temp2.json', 'w+') as outfile:
-    json.dump(wrapper, outfile)
+#use the categorized information to remove redundant gates (any gates that have the same category and ports)
+transmap = {}
+for key in categorizedCircuits.keys():
+    if key != 'misc':
+        # print('\n\n' + str(key) + '\n')
+        sublist = categorizedCircuits[key]
+        #create a list of unique ports
+        uPort = {}
+        for sub in sublist:
+            portstr = ''
+            for port in sub['ports']:
+                portstr += port.lower() + ' '
+            if portstr not in uPort.keys():
+                uPort[portstr] = [sub['name']]
+            else:
+                uPort[portstr].append(sub['name'])
+        # print(uPort)
 
-outf = open(out, mode='+w')
-outf.write(reformatted)
+        #loop through the uPort and create a mapping of old circuits to new circuits
+        for key in uPort.keys():
+            name = extract_gate_name(uPort[key][0])
+            if name != None:
+                if(name in transmap.keys()): #deal with possible overlaps
+                    digit=1
+                    # print(name)
+                    newname = str(name)+'_'+str(digit)
+                    while newname in transmap.keys():
+                        digit+=1
+                        newname = name+'_'+str(digit)
+                    name = newname
+                transmap[name] = uPort[key]
+            else:
+                print('got None as name for ' + str(key) + str(uPort[key]))
+                transmap[uPort[key][0]] = [uPort[key]]
+    else:
+        print('going through misc:\n') #no good way to detect redundancies or lack of with misc circuits
+        for sub in categorizedCircuits[key]:
+            print(sub)
+            transmap[sub['name']] = [sub['name']]
+
+for key in transmap.keys():
+    print(str(key) + ' ' + str(transmap[key]))
+
+#need to invert the map so that the original names can be used as lookups
+finalmap = {}
+for key in transmap.keys():
+    for item in transmap[key]:
+        if isinstance(item, list):
+            print('item is a list: ' +str(item) + ' key: ' + key)
+        finalmap[str(item)] = key
+
+#now that you have a map, create the map file as a json
+mapfile = open('mapfile.json', 'w+')
+json.dump(finalmap, mapfile)
+
+#Create minimum collection of subcircuits
+finalSubs = []
+finalNames = []
+for sub in newsubinfo:
+    translatedname = finalmap[sub['name']]
+    if translatedname in finalNames:
+        continue
+    else:
+        finalNames.append(translatedname)
+        newsub = sub
+        newsub['name'] = translatedname
+        finalSubs.append(newsub)
+
+for sub in finalSubs:
+    print(sub)
+
+#finally, create the standard library file
+#TODO create a function that will generate a python method as a string
+#The resulting python methods should each generate the subcircuits
