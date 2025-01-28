@@ -131,18 +131,18 @@ def replaceNmosPmos(cktinfo:dict, pmosname:str, nmosname:str) -> dict:
             comp['type'] = 'nmos'
     return cktinfo
 
-def makeGenerateMethod(cktinfo:dict) -> str:
+def makeGenerateMethod(cktinfo:dict, wn='45n', wp='45n') -> str:
     final = ''
-    title = cktinfo['name'] + '_generate(filname, use_finfet):\n'
+    title = 'def ' + cktinfo['name'] + '_generate(filename, use_finfet):\n'
     final += title
     final += '\tspice_file = open(filename, "a")\n\n'
     final += '\tspice_file.write("******************************************************************************************\\n")\n'
-    final += '\tspice_file.write(*' + cktinfo['name'] + '\\n)\n'
+    final += '\tspice_file.write("*' + cktinfo['name'] + '\\n")\n'
     final += '\tspice_file.write("******************************************************************************************\\n")\n'
     subcktports = ''
-    for port in subckt['ports']:
+    for port in cktinfo['ports']:
         subcktports += port + ' '
-    subcktdef = '\tspice_file.write(".SUBCKT' + cktinfo['name'] + ' ' + subcktports + 'Wn= Wp= \\n")\n'
+    subcktdef = '\tspice_file.write(".SUBCKT ' + cktinfo['name'] + ' ' + subcktports + 'Wn=' + wn +' Wp=' + wp + '\\n")\n'
     final += subcktdef
     for c in cktinfo['components']:
         cs = c['name'] + ' '
@@ -150,10 +150,15 @@ def makeGenerateMethod(cktinfo:dict) -> str:
         for port in c['connections']:
             portstr += port + ' '
         cs += portstr
-        cs += ' L=gate_length W=Wn AS=Wn*trans_diffusion_length AD=Wn*trans_diffusion_length PS=Wn+2*trans_diffusion_length PD=Wn+2*trans_diffusion_length'
+        cs += c['type'] + ' '
+        cs += 'L=gate_length'
+        if c['type'] == 'nmos':
+            cs += ' W=Wn AS=Wn*trans_diffusion_length AD=Wn*trans_diffusion_length PS=Wn+2*trans_diffusion_length PD=Wn+2*trans_diffusion_length'
+        elif c['type'] == 'pmos':
+            cs += ' W=Wp AS=Wp*trans_diffusion_length AD=Wp*trans_diffusion_length PS=Wp+2*trans_diffusion_length PD=Wp+2*trans_diffusion_length'
         final+='\tspice_file.write("' + cs + '\\n")\n'
     final += '\tspice_file.write(".ENDS\\n")\n'
-    final += '\n\tsprice_file.close()'
+    final += '\n\tspice_file.close()'
     return final
 
 def extract_gate_name(gate_string):
@@ -176,158 +181,214 @@ def extract_gate_name(gate_string):
         # If the format doesn't match, return None or an error message
         return None
 
-def rename_vdd_gnd(subckt:dict):
-    print('do this later')
+def isItVdd(name:str) -> bool:
+    if 'vdd' in name.lower():
+        return True
+    return False
 
-parser = argparse.ArgumentParser(
-    prog='cdl translation tool',
-    description='Converts a cdl to another technology node using information from a spice model',
-    epilog='',
-)
+def isItGnd(name:str) -> bool:
+    if 'gnd' in name.lower():
+        return True
+    if 'ground' in name.lower():
+        return True
+    return False
 
-parser.add_argument('-lib', '-cdl ', '--library', required=True)
-# parser.add_argument('-sp', '--spice', required=True)
-parser.add_argument('-out', '--output')
-parser.add_argument('-pmos', '--pmosname')
-parser.add_argument('-nmos', '--nmosname')
+def isItVss(name:str) -> bool:
+    if 'vss' in name.lower():
+        return True
+    return False
 
 
-args = parser.parse_args()
-print(args)
-libin = args.library
-# spin = args.spice
-out = args.output
-if out == None:
-    out = 'output.l'
-pmosname = args.pmosname
-if pmosname == None:
-    pmosname = 'pmos'
 
-nmosname = args.nmosname
-if nmosname == None:
-    nmosname = 'nmos'
-
-libf = open(libin)
-# spf = open(spin)
-
-lintedlib = cleanCdl(libf)
-reformatted= reformatLib(lintedlib)
-cellnames = extractCellNames(reformatted)
-
-#now go through and extract information for each subckt
-subckts = lintedlib.split('.subckt')
-
-subinfo = []
-for subckt in subckts[1:]:
-    subinfo.append(extractSUBCKTInfo(subckt))
-
-wrapper = {}
-wrapper['subcircuits'] = subinfo
-with open('temp1.json', 'w+') as outfile:
-    json.dump(wrapper, outfile)
-
-#go through and replace pmos and nmos names
-newsubinfo = []
-for subckt in subinfo:
-    newinfo = replaceNmosPmos(subckt, pmosname=pmosname, nmosname=nmosname)
-    newsubinfo.append(newinfo)
-
-#go through the various gates and categorize them
-gatefile = open('basic_circuits.json')
-basicgates = json.load(gatefile)
-categorizedCircuits = {'misc': []}
-for subckt in newsubinfo:
-    added = False
-    minInfo = {}
-    minInfo['name'] = subckt['name']
-    minInfo['ports'] = subckt['ports']
-    for gate in basicgates['gates']:
-        if gate in subckt['name'].lower():
-            if gate in categorizedCircuits.keys():
-                categorizedCircuits[gate].append(minInfo)
+def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True) -> dict:
+    #detect if vdd and vss exist in ports
+    vddexist = False
+    vdds = []
+    vssexist = False
+    vsss = []
+    for port in cktinfo['ports']:
+        if isItVss(port):
+            vssexist = True
+            vsss.append(port)
+        if isItVdd(port):
+            vddexist = True
+            vdds.append(port)
+        if isItGnd(port):
+            if gnd_is_Vss:
+                vssexist = True
+                vsss.append(port)
             else:
-                categorizedCircuits[gate] = []
-                categorizedCircuits[gate].append(minInfo)
-            added = True
-    if not added:
-        categorizedCircuits['misc'].append(minInfo)
+                vddexist = True
+                vdds.append(port)
+    
+        
 
-#use the categorized information to remove redundant gates (any gates that have the same category and ports)
-transmap = {}
-for key in categorizedCircuits.keys():
-    if key != 'misc':
-        # print('\n\n' + str(key) + '\n')
-        sublist = categorizedCircuits[key]
-        #create a list of unique ports
-        uPort = {}
-        for sub in sublist:
-            portstr = ''
-            for port in sub['ports']:
-                portstr += port.lower() + ' '
-            if portstr not in uPort.keys():
-                uPort[portstr] = [sub['name']]
-            else:
-                uPort[portstr].append(sub['name'])
-        # print(uPort)
+    
 
-        #loop through the uPort and create a mapping of old circuits to new circuits
-        for key in uPort.keys():
-            name = extract_gate_name(uPort[key][0])
-            if name != None:
-                if(name in transmap.keys()): #deal with possible overlaps
-                    digit=1
-                    # print(name)
-                    newname = str(name)+'_'+str(digit)
-                    while newname in transmap.keys():
-                        digit+=1
-                        newname = name+'_'+str(digit)
-                    name = newname
-                transmap[name] = uPort[key]
-            else:
-                print('got None as name for ' + str(key) + str(uPort[key]))
-                transmap[uPort[key][0]] = [uPort[key]]
-    else:
-        print('going through misc:\n') #no good way to detect redundancies or lack of with misc circuits
-        for sub in categorizedCircuits[key]:
-            print(sub)
-            transmap[sub['name']] = [sub['name']]
 
-for key in transmap.keys():
-    print(str(key) + ' ' + str(transmap[key]))
 
-#need to invert the map so that the original names can be used as lookups
-finalmap = {}
-for key in transmap.keys():
-    for item in transmap[key]:
-        if isinstance(item, list):
-            print('item is a list, pls fix: ' +str(item) + ' key: ' + key)
-        finalmap[str(item)] = 'njf_' + key
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='cdl translation tool',
+        description='Converts a cdl to another technology node using information from a spice model',
+        epilog='',
+    )
 
-#now that you have a map, create the map file as a json
-mapfile = open('mapfile.json', 'w+')
-json.dump(finalmap, mapfile)
+    parser.add_argument('-lib', '-cdl ', '--library', required=True)
+    # parser.add_argument('-sp', '--spice', required=True)
+    parser.add_argument('-out', '--output')
+    parser.add_argument('-pmos', '--pmosname')
+    parser.add_argument('-nmos', '--nmosname')
 
-#Create minimum collection of subcircuits
-finalSubs = []
-finalNames = []
-for sub in newsubinfo:
-    translatedname = finalmap[sub['name']]
-    if translatedname in finalNames:
-        continue
-    else:
-        finalNames.append(translatedname)
-        newsub = sub
-        newsub['name'] = translatedname
-        finalSubs.append(newsub)
 
-for sub in finalSubs:
-    print(sub)
+    args = parser.parse_args()
+    print(args)
+    libin = args.library
+    # spin = args.spice
+    out = args.output
+    if out == None:
+        out = 'generate.py'
+    pmosname = args.pmosname
+    if pmosname == None:
+        pmosname = 'pmos'
 
-#finally, create the standard library file
-#TODO create a function that will generate a python method as a string
-#The resulting python methods should each generate the subcircuits
-code = ''
-for sub in finalSubs:
-    code += makeGenerateMethod(sub) + '\n'
+    nmosname = args.nmosname
+    if nmosname == None:
+        nmosname = 'nmos'
 
-print(code)
+    libf = open(libin)
+    # spf = open(spin)
+
+    lintedlib = cleanCdl(libf)
+    reformatted= reformatLib(lintedlib)
+    cellnames = extractCellNames(reformatted)
+
+    #now go through and extract information for each subckt
+    subckts = lintedlib.split('.subckt')
+
+    subinfo = []
+    for subckt in subckts[1:]:
+        subinfo.append(extractSUBCKTInfo(subckt))
+
+    wrapper = {}
+    wrapper['subcircuits'] = subinfo
+    with open('temp1.json', 'w+') as outfile:
+        json.dump(wrapper, outfile)
+
+    #go through and replace pmos and nmos names
+    newsubinfo = []
+    for subckt in subinfo:
+        newinfo = replaceNmosPmos(subckt, pmosname=pmosname, nmosname=nmosname)
+        newsubinfo.append(newinfo)
+
+    #go through the various gates and categorize them
+    gatefile = open('basic_circuits.json')
+    basicgates = json.load(gatefile)
+    categorizedCircuits = {'misc': []}
+    for subckt in newsubinfo:
+        added = False
+        minInfo = {}
+        minInfo['name'] = subckt['name']
+        minInfo['ports'] = subckt['ports']
+        for gate in basicgates['gates']:
+            if gate in subckt['name'].lower():
+                if gate in categorizedCircuits.keys():
+                    categorizedCircuits[gate].append(minInfo)
+                else:
+                    categorizedCircuits[gate] = []
+                    categorizedCircuits[gate].append(minInfo)
+                added = True
+        if not added:
+            categorizedCircuits['misc'].append(minInfo)
+
+    #use the categorized information to remove redundant gates (any gates that have the same category and ports)
+    transmap = {}
+    for key in categorizedCircuits.keys():
+        if key != 'misc':
+            # print('\n\n' + str(key) + '\n')
+            sublist = categorizedCircuits[key]
+            #create a list of unique ports
+            uPort = {}
+            for sub in sublist:
+                portstr = ''
+                for port in sub['ports']:
+                    portstr += port.lower() + ' '
+                if portstr not in uPort.keys():
+                    uPort[portstr] = [sub['name']]
+                else:
+                    uPort[portstr].append(sub['name'])
+            # print(uPort)
+
+            #loop through the uPort and create a mapping of old circuits to new circuits
+            for key in uPort.keys():
+                name = extract_gate_name(uPort[key][0])
+                if name != None:
+                    if(name in transmap.keys()): #deal with possible overlaps
+                        digit=1
+                        # print(name)
+                        newname = str(name)+'_'+str(digit)
+                        while newname in transmap.keys():
+                            digit+=1
+                            newname = name+'_'+str(digit)
+                        name = newname
+                    transmap[name] = uPort[key]
+                else:
+                    print('got None as name for ' + str(key) + str(uPort[key]))
+                    transmap[uPort[key][0]] = [uPort[key]]
+        else:
+            print('going through misc:\n') #no good way to detect redundancies or lack of with misc circuits
+            for sub in categorizedCircuits[key]:
+                print(sub)
+                transmap[sub['name']] = [sub['name']]
+
+    for key in transmap.keys():
+        print(str(key) + ' ' + str(transmap[key]))
+
+    #need to invert the map so that the original names can be used as lookups
+    finalmap = {}
+    for key in transmap.keys():
+        for item in transmap[key]:
+            if isinstance(item, list):
+                print('item is a list, pls fix: ' +str(item) + ' key: ' + key)
+            finalmap[str(item)] = 'njf_' + key
+
+    #now that you have a map, create the map file as a json
+    mapfile = open('mapfile.json', 'w+')
+    json.dump(finalmap, mapfile)
+
+    #Create minimum collection of subcircuits
+    finalSubs = []
+    finalNames = []
+    for sub in newsubinfo:
+        translatedname = finalmap[sub['name']]
+        if translatedname in finalNames:
+            continue
+        else:
+            finalNames.append(translatedname)
+            newsub = sub
+            newsub['name'] = translatedname
+            finalSubs.append(newsub)
+
+    #rename vss and vdd
+    for sub in finalSubs:
+        rename_vss_gnd(sub)
+        # print(sub)
+
+    wrapper = {}
+    wrapper['subcircuits'] = finalSubs
+    with open('temp2.json', 'w+') as outfile:
+        json.dump(wrapper, outfile)
+
+
+
+    #finally, create the standard library file
+    #TODO create a function that will generate a python method as a string
+    #The resulting python methods should each generate the subcircuits
+    code = ''
+    methods_to_call = []
+    for sub in finalSubs:
+        code += makeGenerateMethod(sub) + '\n'
+
+    output = open(out, 'w+')
+    output.write(code)
+    output.close
