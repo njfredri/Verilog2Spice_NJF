@@ -382,13 +382,6 @@ class CoffeLibGeneration:
             newinfo = CoffeLibGeneration.replaceNmosPmos(subckt, pmosname=pmosname, nmosname=nmosname)
             newsubinfo.append(newinfo)
 
-        #rename vss and vdd. Data for translation stored in the circuit information
-        #correct unused ports
-        for sub in newsubinfo:
-            CoffeLibGeneration.correct_vdd_vss(sub, newvdd=newvdd, newvss=newvss, gnd_is_Vss=groundisvss)
-            CoffeLibGeneration.removeUnusedPorts(sub)
-            sub['ports_changed'] = not CoffeLibGeneration.arePortsTheSame(sub['ports'], sub['old_ports'])
-
         #go through the various gates and categorize them
         gatefile = open('basic_circuits.json')
         basicgates = json.load(gatefile)
@@ -472,6 +465,13 @@ class CoffeLibGeneration:
                 newsub = sub
                 newsub['name'] = translatedname
                 finalSubs.append(newsub)
+
+        #rename vss and vdd. Data for translation stored in the circuit information
+        #correct unused ports
+        for sub in finalSubs:
+            CoffeLibGeneration.correct_vdd_vss(sub, newvdd=newvdd, newvss=newvss, gnd_is_Vss=groundisvss)
+            CoffeLibGeneration.removeUnusedPorts(sub)
+            sub['ports_changed'] = not CoffeLibGeneration.arePortsTheSame(sub['ports'], sub['old_ports'])
 
         #save port translation in a file. Will not be needed in the future. All info already saved in subcircuit information
         if DEBUG_OUTPUT:
