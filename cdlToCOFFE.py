@@ -6,11 +6,12 @@
 #   Some information such as metal layers will be removed
 
 #TODO list (in no particular order):
-#1. Add arguement or variable for setting vdd and vss as global or non-global. Currently defaults to global
+#1. Add parameter or variable for setting vdd and vss as global or non-global. Currently defaults to global
 #2. Make a method to replace most of main.
 #3. Wrap all (except reformat_json) in a class.
 #4. Add descriptions for all methods 
-#5. Add arguement for basic_circuit file
+#5. Add parameter for basic_circuit file
+#6. Add parameter for subcircuit info file
 ##############################################################################
 
 import argparse
