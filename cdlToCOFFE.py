@@ -12,6 +12,7 @@
 #4. Add descriptions for all methods 
 #5. Add parameter for basic_circuit file
 #6. Add parameter for subcircuit info file
+#7. Add parameter for determining if unused ports should be removed
 ##############################################################################
 
 import argparse
@@ -333,6 +334,18 @@ class CoffeLibGeneration:
         # add the translation info to the circuit info
         cktinfo['vddvss_translation'] = {newvdd : vdds, newvss: vsss}
 
+    def removeUnusedPorts(cktinfo:dict):
+        unused_ports = cktinfo['ports'].copy()
+        for com in cktinfo['components']:
+            for cn in com['connections']:
+                if cn in unused_ports:
+                    unused_ports.remove(cn)
+        cktinfo['unused_ports'] = unused_ports
+        for unused in unused_ports:
+            cktinfo['ports'].remove(unused)
+        print('subcircuit: ' + cktinfo['name'] + ' unused ports: ' + str(unused_ports))
+        return
+
     def arePortsTheSame(ports1: list, ports2: list):
         if len(ports1) != len(ports2):
             return False
@@ -368,6 +381,13 @@ class CoffeLibGeneration:
         for subckt in subinfo:
             newinfo = CoffeLibGeneration.replaceNmosPmos(subckt, pmosname=pmosname, nmosname=nmosname)
             newsubinfo.append(newinfo)
+
+        #rename vss and vdd. Data for translation stored in the circuit information
+        #correct unused ports
+        for sub in newsubinfo:
+            CoffeLibGeneration.correct_vdd_vss(sub, newvdd=newvdd, newvss=newvss, gnd_is_Vss=groundisvss)
+            CoffeLibGeneration.removeUnusedPorts(sub)
+            sub['ports_changed'] = not CoffeLibGeneration.arePortsTheSame(sub['ports'], sub['old_ports'])
 
         #go through the various gates and categorize them
         gatefile = open('basic_circuits.json')
@@ -452,11 +472,6 @@ class CoffeLibGeneration:
                 newsub = sub
                 newsub['name'] = translatedname
                 finalSubs.append(newsub)
-
-        #rename vss and vdd. Data for translation stored in the circuit information
-        for sub in finalSubs:
-            CoffeLibGeneration.correct_vdd_vss(sub, newvdd=newvdd, newvss=newvss, gnd_is_Vss=groundisvss)
-            sub['ports_changed'] = not CoffeLibGeneration.arePortsTheSame(sub['ports'], sub['old_ports'])
 
         #save port translation in a file. Will not be needed in the future. All info already saved in subcircuit information
         if DEBUG_OUTPUT:
