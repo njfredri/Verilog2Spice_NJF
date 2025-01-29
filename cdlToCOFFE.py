@@ -87,17 +87,14 @@ def extractConnections(splitline: list) -> list:
 
 def extractSUBCKTInfo(ckt:str) -> dict:
     info = {}
-    # print(ckt)
     cktlines = ckt.split('\n')
     topdef = filterListForEmptyStr(cktlines[0].split(' '))
-    # print(topdef)
     info['name'] = topdef[0]
     info['ports'] = topdef[1:]
     info['components'] = []
     for component in cktlines[1:]: #for now, assume everything is nmos and pmos
         cinfo = {}
         split = component.split(' ')
-        print('split ' + str(split))
         #skip if end definition
         if(split[0] == '.ends'):
             break
@@ -108,7 +105,6 @@ def extractSUBCKTInfo(ckt:str) -> dict:
             if '=' in spl:
                 break
             firstequal += 1
-        # print('first equal ' + str(firstequal))
         cinfo['name'] = split[0]
         cinfo['connections'] = split[1:firstequal-1]
         cinfo['type'] = split[firstequal-1]
@@ -198,29 +194,121 @@ def isItVss(name:str) -> bool:
         return True
     return False
 
+def findVssInComponents(coms: list) -> list:
+    vss = []
+    for c in coms: #loop through components
+        for connection in c['connections']:
+            if 'vss' in connection.lower():
+                vss.append(connection)
+    return vss
 
+def findVddInComponents(coms: list) -> list:
+    vdd = []
+    for c in coms: #loop through components
+        for connection in c['connections']:
+            if 'vdd' in connection.lower():
+                vdd.append(connection)
+    return vdd
 
-def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True) -> dict:
+def findGndInComponents(coms: list) -> list:
+    gnd = []
+    for c in coms: #loop through components
+        for connection in c['connections']:
+            if 'gnd' in connection.lower():
+                gnd.append(connection)
+    return gnd
+
+def replaceVddInComponents(coms: list, newvdd:str) -> None:
+    for c in coms:
+        newconnections = []
+        for connection in c['connections']:
+            if 'vdd' in connection.lower():
+                newconnections.append(newvdd)
+            else:
+                newconnections.append(connection)
+        c['connections'] = newconnections
+
+def replaceVssInComponents(coms: list, newvdd:str) -> None:
+    for c in coms:
+        newconnections = []
+        for connection in c['connections']:
+            if 'vss' in connection.lower():
+                newconnections.append(newvdd)
+            else:
+                newconnections.append(connection)
+        c['connections'] = newconnections
+
+def replaceGndInComponents(coms: list, newgnd:str) -> None:
+    for c in coms:
+        newconnections = []
+        for connection in c['connections']:
+            if 'gnd' in connection.lower():
+                newconnections.append(newgnd)
+            else:
+                newconnections.append(connection)
+        c['connections'] = newconnections
+
+def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True):
+    cktinfo['old_ports'] = cktinfo['ports']
     #detect if vdd and vss exist in ports
     vddexist = False
     vdds = []
     vssexist = False
     vsss = []
+    finports = [] #collection of final ports. Will not include vdd and vss.
     for port in cktinfo['ports']:
         if isItVss(port):
             vssexist = True
             vsss.append(port)
-        if isItVdd(port):
+        elif isItVdd(port):
             vddexist = True
             vdds.append(port)
-        if isItGnd(port):
+        elif isItGnd(port):
             if gnd_is_Vss:
                 vssexist = True
                 vsss.append(port)
             else:
                 vddexist = True
                 vdds.append(port)
-    
+        else:
+            finports.append(port)
+    finports.append(newvdd)
+    finports.append(newvss)
+    #redo the ports
+    cktinfo['ports'] = finports
+
+    #go through the components and find other VDD and VSS references. Add them to vdds and vsss lists.
+    vdd2 = findVddInComponents(cktinfo['components'])
+    vss2 = findVssInComponents(cktinfo['components'])
+    gnd2 = findGndInComponents(cktinfo['components'])
+    for vdd in vdd2:
+        if vdd not in vdds:
+            vdds.append(vdd)
+    for vss in vss2:
+        if vss not in vsss:
+            vsss.append(vss)
+    for gnd in gnd2:
+        if gnd_is_Vss:
+            if gnd not in vsss:
+                vsss.append(gnd)
+        else:
+            if gnd not in vdds:
+                vdds.append(gnd)
+    #loop through components and replace vdd, vss, and gnd
+    replaceVddInComponents(cktinfo['components'], newvdd)
+    replaceVssInComponents(cktinfo['components'], newvss)
+    if gnd_is_Vss:
+        replaceGndInComponents(cktinfo['components'], newvss)
+    else:
+        replaceGndInComponents(cktinfo['components'], newvdd)
+    # add the tranlation info to the circuit info
+    cktinfo['vddvss_translation'] = {newvdd : vdds, newvss: vsss}
+    # cktinfo['vss_translation'] = {newvss : vsss}
+    # print('oldports: ' + str(cktinfo['old_ports']))
+    # print('newports: ' + str(cktinfo['ports']))
+    # print('translation: ' + str(cktinfo['vddvss_translation']))
+
+
         
 
     
@@ -242,7 +330,6 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()
-    print(args)
     libin = args.library
     # spin = args.spice
     out = args.output
@@ -305,7 +392,6 @@ if __name__ == '__main__':
     transmap = {}
     for key in categorizedCircuits.keys():
         if key != 'misc':
-            # print('\n\n' + str(key) + '\n')
             sublist = categorizedCircuits[key]
             #create a list of unique ports
             uPort = {}
@@ -317,7 +403,6 @@ if __name__ == '__main__':
                     uPort[portstr] = [sub['name']]
                 else:
                     uPort[portstr].append(sub['name'])
-            # print(uPort)
 
             #loop through the uPort and create a mapping of old circuits to new circuits
             for key in uPort.keys():
@@ -336,13 +421,12 @@ if __name__ == '__main__':
                     print('got None as name for ' + str(key) + str(uPort[key]))
                     transmap[uPort[key][0]] = [uPort[key]]
         else:
-            print('going through misc:\n') #no good way to detect redundancies or lack of with misc circuits
+            #no good way to detect redundancies or lack of with misc circuits
             for sub in categorizedCircuits[key]:
-                print(sub)
                 transmap[sub['name']] = [sub['name']]
 
-    for key in transmap.keys():
-        print(str(key) + ' ' + str(transmap[key]))
+    # for key in transmap.keys():
+    #     print(str(key) + ' ' + str(transmap[key]))
 
     #need to invert the map so that the original names can be used as lookups
     finalmap = {}
@@ -353,8 +437,9 @@ if __name__ == '__main__':
             finalmap[str(item)] = 'njf_' + key
 
     #now that you have a map, create the map file as a json
-    mapfile = open('mapfile.json', 'w+')
+    mapfile = open('circuit_translation.json', 'w+')
     json.dump(finalmap, mapfile)
+    mapfile.close()
 
     #Create minimum collection of subcircuits
     finalSubs = []
@@ -369,10 +454,16 @@ if __name__ == '__main__':
             newsub['name'] = translatedname
             finalSubs.append(newsub)
 
-    #rename vss and vdd
+    #rename vss and vdd. Data for translation stored in the circuit information
     for sub in finalSubs:
-        rename_vss_gnd(sub)
-        # print(sub)
+        correct_vdd_vss(sub)
+    #save port translation in a file
+    portmap = {}
+    for sub in finalSubs:
+        portmap[sub['name']] = [sub['old_ports'], sub['ports'], sub['vddvss_translation']]  
+    mapfile = open('port_translation.json' , 'w+')
+    json.dump(portmap, mapfile)
+    mapfile.close()
 
     wrapper = {}
     wrapper['subcircuits'] = finalSubs
@@ -388,6 +479,10 @@ if __name__ == '__main__':
     methods_to_call = []
     for sub in finalSubs:
         code += makeGenerateMethod(sub) + '\n'
+        methods_to_call.append(sub['name'] + '_generate')
+    code += '\n\ndef generate_all(filename):\n'
+    for method in methods_to_call:
+        code += '\t' + method + '(filename, use_finfet=False)\n'
 
     output = open(out, 'w+')
     output.write(code)
