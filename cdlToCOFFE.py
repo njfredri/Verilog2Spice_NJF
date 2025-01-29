@@ -4,11 +4,38 @@
 #   Ex. SAED90nm.cdl -> ptm_22nm.l
 #   Input is .cdl and output is .l
 #   Some information such as metal layers will be removed
+
+#TODO list (in no particular order):
+#1. Add arguement or variable for setting vdd and vss as global or non-global. Currently defaults to global
+#2. Make a method to replace most of main.
+#3. Wrap all (except reformat_json) in a class.
+#4. Add descriptions for all methods 
+#5. Add arguement for basic_circuit file
 ##############################################################################
 
 import argparse
 import re
 import json
+
+#util to help make json files readable
+import json
+
+#variables
+DEBUG_OUTPUT = False
+
+def reformat_json(file_path, indent=4):
+    """Reads a JSON file, reformats it with proper indentation, and overwrites it."""
+    try:
+        with open(file_path, 'r') as file:
+            data = json.load(file)  # Load JSON data
+
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=indent)  # Overwrite with formatted JSON
+
+        print(f"Reformatted JSON saved to {file_path}")
+    except Exception as e:
+        print(f"Error: {e}")
+
 
 def extractCellNames(input: str) -> str:
     # Regular expression to extract cell names
@@ -248,7 +275,7 @@ def replaceGndInComponents(coms: list, newgnd:str) -> None:
                 newconnections.append(connection)
         c['connections'] = newconnections
 
-def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True):
+def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True, vddvss_is_global=True):
     cktinfo['old_ports'] = cktinfo['ports']
     #detect if vdd and vss exist in ports
     vddexist = False
@@ -272,8 +299,9 @@ def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True):
                 vdds.append(port)
         else:
             finports.append(port)
-    finports.append(newvdd)
-    finports.append(newvss)
+    if not vddvss_is_global:
+        finports.append(newvdd)
+        finports.append(newvss)
     #redo the ports
     cktinfo['ports'] = finports
 
@@ -308,41 +336,16 @@ def correct_vdd_vss(cktinfo:dict, newvdd='VDD', newvss='VSS', gnd_is_Vss=True):
     # print('newports: ' + str(cktinfo['ports']))
     # print('translation: ' + str(cktinfo['vddvss_translation']))
 
-
-        
-
-    
-
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        prog='cdl translation tool',
-        description='Converts a cdl to another technology node using information from a spice model',
-        epilog='',
-    )
-
-    parser.add_argument('-lib', '-cdl ', '--library', required=True)
-    # parser.add_argument('-sp', '--spice', required=True)
-    parser.add_argument('-out', '--output')
-    parser.add_argument('-pmos', '--pmosname')
-    parser.add_argument('-nmos', '--nmosname')
+def arePortsTheSame(ports1: list, ports2: list):
+    if len(ports1) != len(ports2):
+        return False
+    for i in range(len(ports1)):
+        if ports1[i] != ports2[i]:
+            return False
+    return True
 
 
-    args = parser.parse_args()
-    libin = args.library
-    # spin = args.spice
-    out = args.output
-    if out == None:
-        out = 'generate.py'
-    pmosname = args.pmosname
-    if pmosname == None:
-        pmosname = 'pmos'
-
-    nmosname = args.nmosname
-    if nmosname == None:
-        nmosname = 'nmos'
-
+def generate_libgeneration_for_COFFE(libin, out, pmosname, nmosname, newvdd, newvss, groundisvss) -> None:
     libf = open(libin)
     # spf = open(spin)
 
@@ -357,10 +360,11 @@ if __name__ == '__main__':
     for subckt in subckts[1:]:
         subinfo.append(extractSUBCKTInfo(subckt))
 
-    wrapper = {}
-    wrapper['subcircuits'] = subinfo
-    with open('temp1.json', 'w+') as outfile:
-        json.dump(wrapper, outfile)
+    if DEBUG_OUTPUT:
+        wrapper = {}
+        wrapper['subcircuits'] = subinfo
+        with open('temp1.json', 'w+') as outfile:
+            json.dump(wrapper, outfile)
 
     #go through and replace pmos and nmos names
     newsubinfo = []
@@ -425,9 +429,6 @@ if __name__ == '__main__':
             for sub in categorizedCircuits[key]:
                 transmap[sub['name']] = [sub['name']]
 
-    # for key in transmap.keys():
-    #     print(str(key) + ' ' + str(transmap[key]))
-
     #need to invert the map so that the original names can be used as lookups
     finalmap = {}
     for key in transmap.keys():
@@ -440,6 +441,7 @@ if __name__ == '__main__':
     mapfile = open('circuit_translation.json', 'w+')
     json.dump(finalmap, mapfile)
     mapfile.close()
+    reformat_json('circuit_translation.json', indent=1)
 
     #Create minimum collection of subcircuits
     finalSubs = []
@@ -456,24 +458,37 @@ if __name__ == '__main__':
 
     #rename vss and vdd. Data for translation stored in the circuit information
     for sub in finalSubs:
-        correct_vdd_vss(sub)
-    #save port translation in a file
-    portmap = {}
-    for sub in finalSubs:
-        portmap[sub['name']] = [sub['old_ports'], sub['ports'], sub['vddvss_translation']]  
-    mapfile = open('port_translation.json' , 'w+')
-    json.dump(portmap, mapfile)
-    mapfile.close()
+        correct_vdd_vss(sub, newvdd=newvdd, newvss=newvss, gnd_is_Vss=groundisvss)
+        sub['ports_changed'] = not arePortsTheSame(sub['ports'], sub['old_ports'])
 
+    #save port translation in a file. Will not be needed in the future. All info already saved in subcircuit information
+    if DEBUG_OUTPUT:
+        portmap = {}
+        for sub in finalSubs:
+            portmap[sub['name']] = [sub['old_ports'], sub['ports'], sub['vddvss_translation']]  
+        mapfile = open('port_translation.json' , 'w+')
+        json.dump(portmap, mapfile)
+        mapfile.close()
+        reformat_json('port_translation.json', indent=1)
+
+
+    if (DEBUG_OUTPUT):
+        wrapper = {}
+        wrapper['subcircuits'] = finalSubs
+        with open('temp2.json', 'w+') as outfile:
+            json.dump(wrapper, outfile)
+            outfile.close()
+        reformat_json('temp2.json', indent=1)
+
+    #output all stdlib information to a json file
     wrapper = {}
     wrapper['subcircuits'] = finalSubs
-    with open('temp2.json', 'w+') as outfile:
+    with open('subcircuit_info.json', 'w+') as outfile:
         json.dump(wrapper, outfile)
-
-
+        outfile.close()
+    reformat_json('subcircuit_info.json', indent=1)
 
     #finally, create the standard library file
-    #TODO create a function that will generate a python method as a string
     #The resulting python methods should each generate the subcircuits
     code = ''
     methods_to_call = []
@@ -487,3 +502,42 @@ if __name__ == '__main__':
     output = open(out, 'w+')
     output.write(code)
     output.close
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='cdl translation tool',
+        description='Converts a cdl to another technology node using information from a spice model',
+        epilog='',
+    )
+
+    parser.add_argument('-lib', '-cdl ', '--library', required=True)
+    # parser.add_argument('-sp', '--spice', required=True)
+    parser.add_argument('-out', '--output')
+    parser.add_argument('-pmos', '--pmosname')
+    parser.add_argument('-nmos', '--nmosname')
+    parser.add_argument('-vdd', '--newvdd')
+    parser.add_argument('-vss', '--newvss')
+    parser.add_argument('-gvss', '--groundisvss')
+
+
+    args = parser.parse_args()
+    libin = args.library
+    out = args.output
+    if out == None:
+        out = 'generate.py'
+    pmosname = args.pmosname
+    if pmosname == None:
+        pmosname = 'pmos'
+
+    nmosname = args.nmosname
+    if nmosname == None:
+        nmosname = 'nmos'
+
+    newvdd = args.newvdd
+    if newvdd == None: newvdd = 'VDD'
+    newvss = args.newvss
+    if newvss == None: newvss = 'VSS'
+    groundisvss = args.groundisvss
+    if groundisvss == None: groundisvss = True
+
+    generate_libgeneration_for_COFFE(libin, out, pmosname, nmosname, newvdd, newvss, groundisvss)
