@@ -156,7 +156,33 @@ class CoffeLibGeneration:
                 comp['type'] = 'nmos'
         return cktinfo
 
-    def makeGenerateMethod(cktinfo:dict, wn='45n', wp='45n') -> str:
+    def makeNewCDL(cktinfo:dict, vdd: str, vss: str) -> str:
+        final = ''
+        final += "******************************************************************************************\n"
+        final += "* "+ cktinfo['name'] +" \n"
+        final += "******************************************************************************************\n"
+        subcktports = ''
+        for port in cktinfo['ports']:
+            subcktports += port + ' '
+        subcktdef = '.subckt ' + cktinfo['name'] + ' ' + subcktports + '\n'
+        final += subcktdef
+        for c in cktinfo['components']:
+            cs = c['name'] + ' '
+            portstr = ''
+            for port in c['connections']:
+                portstr += port + ' '
+            cs += portstr
+            cs += c['type'] + ' '
+            cs += 'l=gate_length'
+            if c['type'] == 'nmos':
+                cs += ' w=Wn'
+            elif c['type'] == 'pmos':
+                cs += ' w=Wp'
+            final+= cs + '\n'
+        final += '\n.ends\n\n .global ' + vdd + ' ' + vss + '\n'
+        return final
+
+    def makeGenerateMethod(cktinfo:dict, wn='45n', wp='45n', vdd='vdd', vss='vss') -> str:
         final = ''
         title = 'def ' + cktinfo['name'] + '_generate(filename, use_finfet):\n'
         final += title
@@ -167,7 +193,7 @@ class CoffeLibGeneration:
         subcktports = ''
         for port in cktinfo['ports']:
             subcktports += port + ' '
-        subcktdef = '\tspice_file.write(".SUBCKT ' + cktinfo['name'] + ' ' + subcktports + 'Wn=' + wn +' Wp=' + wp + '\\n")\n'
+        subcktdef = '\tspice_file.write(".SUBCKT ' + cktinfo['name'] + ' ' + subcktports +vdd+' '+vss+' Wn=' + wn +' Wp=' + wp + '\\n")\n'
         final += subcktdef
         for c in cktinfo['components']:
             cs = c['name'] + ' '
@@ -354,7 +380,6 @@ class CoffeLibGeneration:
                 return False
         return True
 
-
     def generate_libgeneration_for_COFFE(libin, out, pmosname, nmosname, newvdd, newvss, groundisvss) -> None:
         libf = open(libin)
         # spf = open(spin)
@@ -375,6 +400,10 @@ class CoffeLibGeneration:
             wrapper['subcircuits'] = subinfo
             with open('temp1.json', 'w+') as outfile:
                 json.dump(wrapper, outfile)
+
+        #go through and capitalize all names
+        for subckt in subinfo:
+            subckt['name'] = subckt['name'].upper()
 
         #go through and replace pmos and nmos names
         newsubinfo = []
@@ -503,16 +532,21 @@ class CoffeLibGeneration:
         #finally, create the standard library file
         #The resulting python methods should each generate the subcircuits
         code = ''
+        cdl = ''
         methods_to_call = []
         for sub in finalSubs:
             code += CoffeLibGeneration.makeGenerateMethod(sub) + '\n'
             methods_to_call.append(sub['name'] + '_generate')
+            cdl += CoffeLibGeneration.makeNewCDL(sub, newvdd, newvss) + '\n'
         code += '\n\ndef generate_all(filename):\n'
         for method in methods_to_call:
             code += '\t' + method + '(filename, use_finfet=False)\n'
 
         output = open(out, 'w+')
         output.write(code)
+        output.close
+        output = open('newcdl.cdl', 'w+')
+        output.write(cdl)
         output.close
 
 if __name__ == '__main__':
