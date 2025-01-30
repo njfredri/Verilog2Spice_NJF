@@ -29,6 +29,7 @@ class translateVerilogNetlist:
         self.replacePorts()
         for line in self.verilogLines:
             print(line)
+        self.shortenLines()
         # for key in self.portTranslations:
         #     print(key + ' ' + str(self.portTranslations[key]))
 
@@ -130,7 +131,7 @@ class translateVerilogNetlist:
             print(key)
             print(self.portTranslations[key])
                             
-    def replacePorts(self):
+    def replacePorts(self) -> list:
         newlines = []
         portPattern = r'\.(\w+)\(([^)]+)\)'
         for line in self.verilogLines:
@@ -170,6 +171,56 @@ class translateVerilogNetlist:
         self.verilogLines = newlines
         return
 
+    def breakLineUp(string, limit=150, min_length = 20, newline_prefix=''):
+        parts = [string]
+        longest_length = max(len(part) for part in parts)
+        somethingBroken = True #keeps track if you are still shortening strings. If you can't shorten anything anymore, just stop
+        while longest_length > limit and somethingBroken:
+            # print('over limit\n')
+            somethingBroken = False
+            #loop through list and break long strings in 2
+            for s in parts:
+                # print('loop2: ' + s)
+                if len(s) > limit and len(s) > min_length:
+                    # print('loop3: ' + s)
+                    #go to char 150. Go backwards until it finds a space
+                    for i in range(limit,1, -1): #don't need to look at 0 since it's the end
+                        print(i)
+                        if s[i] == ' ': #if s is a space. break it
+                            part1 = s[0:i]
+                            part2 = newline_prefix + s[i+1:] #remove the space
+                            newparts = []
+                            for p in parts: #now loop through and replace the broken part while keeping the others
+                                if s == p:
+                                    newparts.append(part1)
+                                    newparts.append(part2)
+                                else:
+                                    newparts.append(p)
+                            parts = newparts
+                            somethingBroken = True
+                            break
+        return parts
+
+    def shortenLines(self) -> None:
+        newlines = []
+        for line in self.verilogLines:
+            if len(line) > 150: #if too long, break it up
+                brokenLines = translateVerilogNetlist.breakLineUp(line, 150, 30)
+                # print('brokenlines ' + str(brokenLines))
+                for bl in brokenLines:
+                    newlines.append(bl)
+            else:
+                newlines.append(line)
+        self.verilogLines = newlines
+
+    def outputToVerilog(self, filename: str) -> None:
+        file = open(filename, 'w+')
+        for line in self.verilogLines:
+            file.write(line + '\n')
+        file.close()
+        return
+
 if __name__ == '__main__':
     # translateVerilogNetlist.minimumVerilog('synthesized_flat.v')
     tvn = translateVerilogNetlist()
+    tvn.outputToVerilog('newverilog.v')
