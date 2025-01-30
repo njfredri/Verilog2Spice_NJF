@@ -178,6 +178,10 @@ for line1 in verfl:
 					if j == len(nodes) :
 						print ( 'ERROR : pin ' + cells[i][pin] + ' of the Spice netlist not found for the cell ' + inst_name + ' of the Verilog netlist !')
 						nb_pins += 1
+						print(pins)
+						print(cells[i])
+						print('connecting unspecified pin to ground')
+						instance = instance + ' 0'
 					else :
 						instance = instance + ' ' + nodes[j]
 			# print (instance + ' ' + subckt)

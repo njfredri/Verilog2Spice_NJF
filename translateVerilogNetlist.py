@@ -8,7 +8,7 @@ class translateVerilogNetlist:
         self.wires = []
         self.regs = []
         self.portTranslations = {}
-        minV = translateVerilogNetlist.minimumVerilogLines('synthesized_flat.v')
+        minV = translateVerilogNetlist.minimumVerilogLines('boothR2_serial_alu_synth.v')
         minLines = translateVerilogNetlist.joinLines(minV)
         self.verilogLines = minLines
         self.inputs = translateVerilogNetlist.grabSignals(self.verilogLines, 'input')
