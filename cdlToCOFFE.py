@@ -510,7 +510,7 @@ class CoffeLibGeneration:
             mapfile = open('port_translation.json' , 'w+')
             json.dump(portmap, mapfile)
             mapfile.close()
-            reformat_json('port_translation.json', indent=1)
+            CoffeLibGeneration.reformat_json('port_translation.json', indent=1)
 
 
         if (DEBUG_OUTPUT):
@@ -519,7 +519,7 @@ class CoffeLibGeneration:
             with open('temp2.json', 'w+') as outfile:
                 json.dump(wrapper, outfile)
                 outfile.close()
-            reformat_json('temp2.json', indent=1)
+            CoffeLibGeneration.reformat_json('temp2.json', indent=1)
 
         #output all stdlib information to a json file
         wrapper = {}
