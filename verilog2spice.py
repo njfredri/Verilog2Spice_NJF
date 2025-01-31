@@ -75,9 +75,9 @@ for spi_file in spi_files :
 		spi_file = spi_file[spi_file.rfind('/')+1:]
 	spi_inc = spi_inc + spi_file + ' '
 	for line1 in spifl:
-		words = line1.upper().rstrip('\r\n').strip().split()
+		words = line1.rstrip('\r\n').strip().split()
 		if len(words) > 0:
-			if words[0].find('SUBCKT') == 1 :
+			if words[0].upper().find('SUBCKT') == 1 :
 				subckt_on = True
 				nb_subckt += 1
 				words.pop(0)
@@ -86,7 +86,7 @@ for spi_file in spi_files :
 				cells[cell_num].extend(words)  # store each cell_name and pins in a list
 			else :
 				subckt_on = False
-			if words[0].find('ENDS') == 1 : # end of SUBCKT
+			if words[0].upper().find('ENDS') == 1 : # end of SUBCKT
 				#print (cells[cell_num])
 				cell_num += 1
 	spifl.close()
@@ -103,21 +103,21 @@ outfl = open(out_file,'w')   # open the output SPICE netlist
 
 nb_subckt = 0
 nb_pins = 0
-outfl.write('*\n*  ' +out_file + ' : SPICE netlist translated from the VERILOG netlist : ' + ver_file + '\n')
+outfl.write('*\n*  ' + out_file + ' : SPICE netlist translated from the VERILOG netlist : ' + ver_file + '\n')
 outfl.write('*'+ ' '* (len(out_file) + 5 ) + 'on the ' + str(datetime.now())+ '\n*\n')
 outfl.write('*' * (len(out_file) + len(ver_file) + 60) + '\n\n')
 outfl.write('.INCLUDE ' + spi_inc + '\n\n')
 
 for line1 in verfl:
-	words = line1.upper().rstrip('\r\n').strip().split()
+	words = line1.rstrip('\r\n').strip().split()
 	if len(words) > 0:
-		if words[0].find('MODULE') == 0 : #first build the toplevel subckt
+		if words[0].upper().find('MODULE') == 0 : #first build the toplevel subckt
 			subckt_name = words[1]
 			subckt = '.SUBCKT ' + subckt_name + ' '
-		if words[0].startswith('INPUT') or words[0].startswith('OUTPUT') or words[0].startswith('INOUT') :
+		if words[0].upper().startswith('INPUT') or words[0].upper().startswith('OUTPUT') or words[0].upper().startswith('INOUT') :
 			subckt_on = True
 			if line1.find('[') == -1 : # pins that are not a bus
-				subckt += line1[line1.upper().find(words[0])+6:].strip() + ' '
+				subckt += line1[line1.find(words[0])+6:].strip() + ' '
 				subckt = subckt.replace(',','')
 				subckt = subckt.replace(';','')
 				
@@ -132,11 +132,11 @@ for line1 in verfl:
 	if subckt_on and line1.find('(')>0 : # first cell detected : write the toplevel .SUBCKT
 		subckt_on = False
 		if del_on :  # change the busses delimiter
-			subckt = subckt.replace('[','<').replace(']','>')
-		outfl.write('.GLOBAL ' + pos_pwr + ' ' + neg_pwr + '\n\n' + subckt.upper() + '\n\n')
+			subckt = subckt.replace('[','_bus').replace(']','_')
+		outfl.write('.GLOBAL ' + pos_pwr + ' ' + neg_pwr + '\n\n' + subckt + '\n\n')
 
-	if (not subckt_on) and (not inst_on) and re.search('\(\s*\.',line1) and words[0].find('MODULE') != 0 and line1.strip()[0:2].find('//') != 0 :
-		words = line1.upper().rstrip('\r\n').strip().split()
+	if (not subckt_on) and (not inst_on) and re.search('\(\s*\.',line1) and words[0].upper().find('MODULE') != 0 and line1.strip()[0:2].find('//') != 0 :
+		words = line1.rstrip('\r\n').strip().split()
 		if words[1][0] == 'X' :  # avoid double XX at the beginning of the instance name
 			instance = words[1]
 		else :
@@ -145,15 +145,15 @@ for line1 in verfl:
 		inst_on = True
 		line2 = line1[line1.find('(')+1:]
 	elif (not subckt_on) and inst_on :  # store all the instance description into line2
-		line2 = line2 + line1.upper()
+		line2 = line2 + line1
 
 	if inst_on and line1.find(';')>0 : # end of the cell description
 		inst_on = False
 		if del_on :  # change the busses delimiter
-			line2 = line2.replace('\[','\<').replace('\]','\>')
+			line2 = line2.replace('[','_bus').replace(']','_')
 		pins=[]  # list of pins
 		nodes=[]  # list of netlist nodes
-		words = line2.upper().rstrip('\r\n').strip().split('.')
+		words = line2.rstrip('\r\n').strip().split('.')
 		all_pins = '  '
 		for word in words :
 			pins.append(word[:word.find('(')])
@@ -178,10 +178,6 @@ for line1 in verfl:
 					if j == len(nodes) :
 						print ( 'ERROR : pin ' + cells[i][pin] + ' of the Spice netlist not found for the cell ' + inst_name + ' of the Verilog netlist !')
 						nb_pins += 1
-						print(pins)
-						print(cells[i])
-						print('connecting unspecified pin to ground')
-						instance = instance + ' 0'
 					else :
 						instance = instance + ' ' + nodes[j]
 			# print (instance + ' ' + subckt)
