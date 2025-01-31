@@ -2,25 +2,27 @@ import json
 import re
 
 class translateVerilogNetlist:
-    def __init__(self):
+    def __init__(self, verilogFile, circuitInfoFile='subcircuit_info.json', circuitTranslationFile = 'circuit_translation.json'):
         self.inputs = [] #include reg and wires
         self.outputs = []
         self.wires = []
         self.regs = []
         self.portTranslations = {}
-        minV = translateVerilogNetlist.minimumVerilogLines('boothR2_serial_alu_synth.v')
+        minV = translateVerilogNetlist.minimumVerilogLines(verilogFile)
         minLines = translateVerilogNetlist.joinLines(minV)
         self.verilogLines = minLines
         self.inputs = translateVerilogNetlist.grabSignals(self.verilogLines, 'input')
         self.outputs = translateVerilogNetlist.grabSignals(self.verilogLines, 'output')
         self.wires = translateVerilogNetlist.grabSignals(self.verilogLines, 'wire')
         self.regs = translateVerilogNetlist.grabSignals(self.verilogLines, 'reg')
-        # print(self.inputs)
-        # print(self.outputs)
-        # print(self.wires)
-        # print(self.regs)
-        self.celltranslation = json.load(open('circuit_translation.json'))
-        self.cellInfo = json.load(open('subcircuit_info.json'))
+        # read in circuit and translation information
+        cTransF = open(circuitTranslationFile)
+        self.celltranslation = json.load(cTransF)
+        cTransF.close()
+        cInfoF = open(circuitInfoFile)
+        self.cellInfo = json.load(cInfoF)
+        cInfoF.close()
+
         self.cellNames = []
         for cell in self.cellInfo['subcircuits']:
             self.cellNames.append(cell['name'])
@@ -30,8 +32,7 @@ class translateVerilogNetlist:
         for line in self.verilogLines:
             print(line)
         self.shortenLines()
-        # for key in self.portTranslations:
-        #     print(key + ' ' + str(self.portTranslations[key]))
+
 
     def clean_whitespace(text):
         return re.sub(r'\s+', ' ', text).strip()
@@ -213,7 +214,7 @@ class translateVerilogNetlist:
                 newlines.append(line)
         self.verilogLines = newlines
 
-    def outputToVerilog(self, filename: str) -> None:
+    def outputTranslatedVerilog(self, filename: str) -> None:
         file = open(filename, 'w+')
         for line in self.verilogLines:
             file.write(line + '\n')
@@ -221,6 +222,5 @@ class translateVerilogNetlist:
         return
 
 if __name__ == '__main__':
-    # translateVerilogNetlist.minimumVerilog('synthesized_flat.v')
     tvn = translateVerilogNetlist()
-    tvn.outputToVerilog('newverilog.v')
+    tvn.outputTranslatedVerilog('newverilog.v')

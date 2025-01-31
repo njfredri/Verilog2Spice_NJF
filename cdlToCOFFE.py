@@ -380,7 +380,7 @@ class CoffeLibGeneration:
                 return False
         return True
 
-    def generate_libgeneration_for_COFFE(libin, out, pmosname, nmosname, newvdd, newvss, groundisvss) -> None:
+    def generate_libgeneration_for_COFFE(libin, out, newlib, pmosname, nmosname, newvdd, newvss, groundisvss) -> None:
         libf = open(libin)
         # spf = open(spin)
 
@@ -545,7 +545,7 @@ class CoffeLibGeneration:
         output = open(out, 'w+')
         output.write(code)
         output.close
-        output = open('newcdl.cdl', 'w+')
+        output = open(newlib, 'w+')
         output.write(cdl)
         output.close
 
