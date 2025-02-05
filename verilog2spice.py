@@ -178,7 +178,8 @@ class Verilog2Spice:
 							while j < len(pins) and cells[i][pin] != pins[j] : # if the verilog pin name = spice pin name
 								j += 1
 							if j == len(nodes) :
-								print ( 'ERROR : pin ' + cells[i][pin] + ' of the Spice netlist not found for the cell ' + inst_name + ' of the Verilog netlist !')
+								print ( 'Warning : pin ' + cells[i][pin] + ' of the Spice netlist not found for the cell ' + inst_name + ' of the Verilog netlist !  Connecting to ground (0) by default.')
+								instance = instance + ' 0'
 								nb_pins += 1
 							else :
 								instance = instance + ' ' + nodes[j]

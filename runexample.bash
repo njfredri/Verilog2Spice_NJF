@@ -1,0 +1,1 @@
+python3 Verilog2Spice4COFFE.py -cdl saed90nm.cdl -ver synthesized_flat.v -out final.sp --pmosname P12 --nmosname N12 -vdd n_vdd -vss n_gnd 
