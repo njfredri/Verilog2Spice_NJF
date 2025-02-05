@@ -221,6 +221,7 @@ class Verilog2Spice:
                     nb_subckt += 1
                 else :
                     inst_name = instance
+                    print(inst_name)
                     for pin in range(1,len(cells[i])) : # search for the pins of the SPICE subckt
                         if cells[i][pin] == pos_pwr :
                             instance = instance + ' ' + pos_pwr
@@ -254,4 +255,4 @@ class Verilog2Spice:
         return
 
 if __name__ == '__main__':
-    Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='newverilog.v', out_file='final1.sp', pos_pwr='njf_vdd', neg_pwr='njf_gnd', del_on=True)
+    Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='adder_4bit_synth.v', out_file='final1.sp', pos_pwr='njf_vdd', neg_pwr='njf_gnd', del_on=True)
