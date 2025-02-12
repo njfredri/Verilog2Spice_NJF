@@ -1,0 +1,21 @@
+{
+    "NAND2X0": "nand2_decode",
+    "NAND2X1": "nand2_decode",
+    "NAND2X2": "nand2_decode",
+    "NAND2X4": "nand2_decode",
+    "NAND3X0": "nand3_decode",
+    "NAND3X1": "nand3_decode",
+    "NAND3X2": "nand3_decode",
+    "NAND3X4": "nand3_decode",
+    "NOR2X0": "nor2_decode",
+    "NOR2X1": "nor2_decode",
+    "NOR2X2": "nor2_decode",
+    "NOR2X4": "nor2_decode",
+    "INVX0": "inv",
+    "INVX16": "inv",
+    "INVX1": "inv",
+    "INVX2": "inv",
+    "INVX32": "inv",
+    "INVX4": "inv",
+    "INVX8": "inv"
+}

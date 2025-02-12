@@ -253,6 +253,51 @@ class Verilog2Spice:
         outfl.close()
 
         return
-
+    
+    def translateSpice2Coffe(sp, spout, translation, pos_pwr, neg_pwr):
+        net = open(sp)
+        netlines = net.readlines()
+        temp = open(translation)
+        translation = json.load(temp)
+        temp.close()
+        print(translation)
+        inSub = False #says if you are in a subcircuit definition
+        newnet = []
+        for line in netlines:
+            newline = line.strip()
+            if '.subckt' in line.lower():
+                inSub = True
+                #add in vdd and gnd if not already in there
+                if 'vdd' not in line.lower():
+                    newline += ' ' + pos_pwr
+                if 'gnd' not in line.lower():
+                    newline += ' ' + neg_pwr
+                # newnet.append(newline)
+            elif '.ends' in line.lower():
+                inSub = False
+            else:
+                #
+                words = line.split()
+                print(words)
+                if len(words) == 0:
+                    continue
+                if words[-1] in translation.keys() is not None:
+                    newwords = words[:len(words)-1]
+                    newsub = translation[words[-1]]
+                    #add in vdd and gnd if not already in there
+                    if 'vdd' not in line.lower():
+                        newwords.append(pos_pwr)
+                    if 'gnd' not in line.lower():
+                        newwords.append(neg_pwr)
+                    newwords.append(newsub) 
+                    newline = ' '.join(newwords)
+                    print(newline)
+            newnet.append(newline)
+        outf = open(spout, 'w+')
+        outf.write('\n'.join(newnet))
+        outf.close()
+                    
+                
 if __name__ == '__main__':
-    Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='adder_4bit_synth.v', out_file='final1.sp', pos_pwr='njf_vdd', neg_pwr='njf_gnd', del_on=True)
+    Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='adder_4bit_synth.v', out_file='temp.sp', pos_pwr='n_vdd', neg_pwr='n_gnd', del_on=True)
+    Verilog2Spice.translateSpice2Coffe(sp='temp.sp', spout='final.sp', translation='temp_translation.json', pos_pwr='n_vdd', neg_pwr='n_gnd')
