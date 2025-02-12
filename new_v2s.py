@@ -301,3 +301,7 @@ class Verilog2Spice:
 if __name__ == '__main__':
     Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='adder_4bit_synth.v', out_file='temp.sp', pos_pwr='n_vdd', neg_pwr='n_gnd', del_on=True)
     Verilog2Spice.translateSpice2Coffe(sp='temp.sp', spout='final.sp', translation='temp_translation.json', pos_pwr='n_vdd', neg_pwr='n_gnd')
+    #Todo. Use the spice file to make a python method.
+    #While doing this, generate Wn and Wp for inv, nor and nand
+    #To do wn and wp, could have one variable for each type of gate in a circuit. Another way is to have one variable for each gate. Lastly, could use fixed values.
+    #fixed values example can be seen in manchester4_dummy in BRAMAC
