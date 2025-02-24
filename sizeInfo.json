@@ -1,0 +1,30 @@
+{
+    "nand2_dummy" : {
+        "var" : ["Wn", "Wp"],
+        "Wn" : "45n",
+        "Wp" : "55n",
+        "resizeable" : "False"
+    },
+    "nor2_dummy" : {
+        "var" : ["Wn", "Wp"],
+        "Wn" : "45n",
+        "Wp" : "55n",
+        "resizeable" : "False"
+    },
+    "nand2_decode" : {
+        "var" : ["Wn", "Wp"],
+        "Wn" : "45n",
+        "Wp" : "55n",
+        "resizeable" : "False"
+    },
+    "nor2_decode" : {
+        "var" : ["Wn", "Wp"],
+        "Wn" : "45n",
+        "Wp" : "55n",
+        "resizeable" : "False"
+    },
+    "inv" : {
+        "var" : ["Wn", "Wp"],
+        "resizeable" : "True"
+    }
+}
