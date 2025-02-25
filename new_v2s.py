@@ -260,6 +260,7 @@ class Verilog2Spice:
         temp = open(translation)
         translation = json.load(temp)
         temp.close()
+
         print(translation)
         inSub = False #says if you are in a subcircuit definition
         newnet = []
@@ -293,14 +294,91 @@ class Verilog2Spice:
                     newline = ' '.join(newwords)
                     print(newline)
             newnet.append(newline)
+        
+        #loop through and generate a python method
+        # pylines = []
+        # pylines.append("def " + )
+        # for line in newnet:
+            
         outf = open(spout, 'w+')
         outf.write('\n'.join(newnet))
         outf.close()
                     
+            
+    def translateCoffeSpice2Python(sp, pyout, sizingInfo):
+        net = open(sp)
+        netlines = net.readlines()
+        temp = open(sizingInfo)
+        sizing = json.load(temp)
+        temp.close()
+
+        codeLines = []
+        transnames = []
+        wirenames = [] #not checking for this. This will need to be added manually
+        cir_name = ""
+        inSubckt = False
+        for line in netlines:
+            if '*' in line.lower():
+                print(line)
+                continue
+            else:
+                if '.subckt' in line.lower():
+                    cir_name = line.split()[1].strip()
+                    codeLines.append("def gen_" + str(cir_name) + "(spice_filename, circuit_name, numberofsrams):\n\t" + "spice_file = open(spice_filename,'a')")
+                    inSubckt = True
                 
+                if inSubckt:
+                    pyline = "\tspice_file.write('" #+ line + "')"
+                    pyline += line.replace("\n","") + "')"
+
+                    words = line.split()
+                    type = words[-1]
+                    #add in variables for width and stuff
+                    extra = '\tspice_file.write("'
+                    if type in sizing.keys():
+                        info = sizing[type]
+                        print(type)
+                        for var in info['var']:
+                            if info[var] != None: #fill in the variable with the provided values
+                                extra += str(var) + '=' + str(info[var]) + ' '
+                        if ";pmos;" in extra:
+                            pmos_name = cir_name.lower()+'_'+type+'_pmos'
+                            extra = extra.replace(";pmos;", pmos_name)
+                            if pmos_name not in transnames:
+                                transnames.append(pmos_name)
+                        if ";nmos;" in extra:
+                            nmos_name = cir_name.lower()+'_'+type+'_pmos'
+                            extra = extra.replace(";nmos;", nmos_name)
+                            if nmos_name not in transnames:
+                                transnames.append(nmos_name)
+                            
+                    extra+='\\n")'
+                    pyline += '\n' + extra
+                            
+
+
+                    codeLines.append(pyline)
+        
+        transistorList = '\t#Now Append the List of Transistors\n\ttran_names_list=[]'
+        for trans in transnames:
+            transistorList += '\n\ttran_names_list.append("'+trans+'")'
+        
+        wireList = '\t#Now Append the List of Wires\n\twire_names_list=[]'
+        for wire in wirenames:
+            transistorList += '\n\twire_names_list.append("'+wire+'")'
+
+        codeLines.append(transistorList)
+        codeLines.append(wireList)
+        codeLines.append("\treturn tran_names_list, wire_names_list")
+
+        outf = open(pyout,"w+")
+        outf.write("\n".join(codeLines))
+
+
 if __name__ == '__main__':
     Verilog2Spice.verilogNetlist2Spice(spi_files=['saed90nm.cdl'], ver_file='adder_4bit_synth.v', out_file='temp.sp', pos_pwr='n_vdd', neg_pwr='n_gnd', del_on=True)
     Verilog2Spice.translateSpice2Coffe(sp='temp.sp', spout='final.sp', translation='temp_translation.json', pos_pwr='n_vdd', neg_pwr='n_gnd')
+    Verilog2Spice.translateCoffeSpice2Python(sp='final.sp', pyout='final.py', sizingInfo='sizeInfo.json')
     #Todo. Use the spice file to make a python method.
     #While doing this, generate Wn and Wp for inv, nor and nand
     #To do wn and wp, could have one variable for each type of gate in a circuit. Another way is to have one variable for each gate. Lastly, could use fixed values.

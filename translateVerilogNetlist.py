@@ -33,7 +33,6 @@ class translateVerilogNetlist:
             print(line)
         self.shortenLines()
 
-
     def clean_whitespace(text):
         return re.sub(r'\s+', ' ', text).strip()
 

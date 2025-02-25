@@ -22,33 +22,7 @@ from datetime import datetime
 
 class Verilog2Spice:
 	def verilogNetlist2Spice(spi_files=[],ver_file='', out_file='', pos_pwr='VDD', neg_pwr='VSS', del_on=True):
-	# spi_files = []
-	# ver_file = ''
-	# out_file = ''
-	# pos_pwr = 'VDD'
-	# neg_pwr = 'VSS'
-	# del_on = False
-
-		# for arg in range(1,len(sys.argv)) : # parse all arguments 
-		# 	if sys.argv[arg] == '-spice' :
-		# 			spi_files.append(sys.argv[arg+1])
-		# 	elif sys.argv[arg] == '-verilog' :
-		# 			if ver_file != "" :
-		# 				print ('ERROR : only one structured Verilog netlist can be specified !')
-		# 			else :
-		# 				ver_file = sys.argv[arg+1]
-		# 	elif sys.argv[arg] == '-output' :
-		# 			if out_file != "" :
-		# 				print ('ERROR : only one output Spice netlist can be specified !')
-		# 			else :
-		# 				out_file = sys.argv[arg+1]
-		# 	if sys.argv[arg] == '-pos_pwr' :
-		# 			pos_pwr = sys.argv[arg+1]
-		# 	if sys.argv[arg] == '-neg_pwr' :
-		# 			neg_pwr = sys.argv[arg+1]
-		# 	elif sys.argv[arg] == '-delimiter' :
-		# 		del_on = True
-				
+	
 		if len(spi_files) == 0 :
 			sys.exit("Spice library netlist not specified")
 		if ver_file == "" :
@@ -92,7 +66,6 @@ class Verilog2Spice:
 						#print (cells[cell_num])
 						cell_num += 1
 			spifl.close()
-
 		if nb_subckt == 0 :
 			sys.exit('\nERROR : NO subckt found in the Spice netlist !\n')
 		else :

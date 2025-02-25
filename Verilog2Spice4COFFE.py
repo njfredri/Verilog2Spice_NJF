@@ -28,7 +28,7 @@ def v2sp4cFlow(cdlFile, verilogFile, out, coffe_py_out,
 
     if delete_temp_files:
         attemptFileRemoval('circuit_translation.json')
-        attemptFileRemoval('subcircuit_info.json')
+        # attemptFileRemoval('subcircuit_info.json')
 
 
 if __name__ == '__main__':

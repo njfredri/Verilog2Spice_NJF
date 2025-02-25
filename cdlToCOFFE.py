@@ -415,6 +415,7 @@ class CoffeLibGeneration:
         gatefile = open('basic_circuits.json')
         basicgates = json.load(gatefile)
         categorizedCircuits = {'misc': []}
+        
         for subckt in newsubinfo:
             added = False
             minInfo = {}
@@ -474,7 +475,7 @@ class CoffeLibGeneration:
             for item in transmap[key]:
                 if isinstance(item, list):
                     print('item is a list, pls fix: ' +str(item) + ' key: ' + key)
-                finalmap[str(item)] = 'njf_' + key
+                finalmap[str(item)] = 'n_' + key
 
         #now that you have a map, create the map file as a json
         mapfile = open('circuit_translation.json', 'w+')

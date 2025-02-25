@@ -6,6 +6,9 @@
         "xnor",
         "or",
         "not",
-        "xor"
+        "xor",
+        "inv",
+        "aoinv",
+        "lnand"
     ]
 }
